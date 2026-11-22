@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PINCHSERVO v1.1</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 20px;
+  background: #10131b;
+  color: #e8edf5;
+  font-family: Arial, sans-serif;
+}
+
+.container {
+  max-width: 850px;
+  margin: auto;
+}
+
+h1 {
+  color: #63e6be;
+  margin-bottom: 5px;
+}
+
+.subtitle { color: #929bad; margin-top: 0; }
+
+.panel {
+  background: #1a2030;
+  border: 1px solid #30394d;
+  border-radius: 12px;
+  padding: 18px;
+  margin-top: 18px;
+}
+
+input, button {
+  padding: 12px;
+  border-radius: 7px;
+  border: 1px solid #39465e;
+  background: #111827;
+  color: white;
+  font-size: 14px;
+}
+
+input[type="text"] { width: 100%; }
+
+input[type="range"] {
+  width: 100%;
+  accent-color: #63e6be;
+  padding: 0;
+}
+
+button {
+  cursor: pointer;
+  background: #087f5b;
+  border: none;
+  margin-top: 10px;
+}
+
+button:hover { background: #099268; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+.video-container {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #000;
+  margin-top: 12px;
+}
+
+video {
+  width: 100%;
+  display: block;
+  transform: scaleX(-1);
+}
+
+canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: scaleX(-1);
+  pointer-events: none;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.stat {
+  background: #111827;
+  padding: 15px 5px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.stat small {
+  color: #929bad;
+  font-size: 11px;
+}
+
+.stat strong {
+  display: block;
+  font-size: 23px;
+  margin-top: 7px;
+  color: #63e6be;
+}
+
+.status {
+  color: #ffd43b;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.status.ok { color: #63e6be; }
+.status.error { color: #ff8787; }
+
+label { font-size: 13px; color: #b6c0d0; }
+
+footer {
+  color: #758096;
+  text-align: center;
+  margin-top: 25px;
+  font-size: 12px;
+}
+
+@media (max-width: 420px) {
+  body { padding: 12px; }
+  .panel { padding: 14px; }
+  .stat strong { font-size: 19px; }
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<h1>PINCHSERVO</h1>
+<p class="subtitle">MediaPipe Vision · ESP32 · SG90</p>
+
+<div class="panel">
+  <h3>ESP32 Connection</h3>
+  <input type="text" id="espIP"
+    value="192.168.1.100"
+    placeholder="ESP32 IP address">
+
+  <button id="connectBtn">Connect ESP32</button>
+  <p class="status" id="connectionStatus">Not connected</p>
+</div>
+
+<div class="panel">
+  <h3>Hand Tracking</h3>
+
+  <div class="video-container">
+    <video id="video" autoplay muted playsinline></video>
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <button id="startBtn">Start Camera</button>
+  <button id="stopBtn">Stop Camera</button>
+
+  <p class="status" id="trackingStatus">Camera stopped</p>
+
+  <div class="stats">
+    <div class="stat">
+      <small>ANGLE</small>
+      <strong id="angleValue">90°</strong>
+    </div>
+    <div class="stat">
+      <small>PINCH RATIO</small>
+      <strong id="distanceValue">--</strong>
+    </div>
+    <div class="stat">
+      <small>FPS</small>
+      <strong id="fpsValue">0</strong>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h3>Pinch Calibration</h3>
+
+  <label>
+    Minimum distance:
+    <span id="minLabel">0.15</span>
+  </label>
+
+  <input id="minDistance" type="range"
+    min="0.05" max="0.60" step="0.01" value="0.15">
+
+  <br><br>
+
+  <label>
+    Maximum distance:
+    <span id="maxLabel">1.00</span>
+  </label>
+
+  <input id="maxDistance" type="range"
+    min="0.30" max="1.80" step="0.01" value="1.00">
+
+  <p class="status">
+    Pinch closer = lower angle. Open fingers = higher angle.
+  </p>
+</div>
+
+<div class="panel">
+  <h3>Manual Servo Control</h3>
+
+  <input type="range" id="manualAngle"
+    min="0" max="180" value="90">
+
+  <p>Manual angle: <strong id="manualValue">90°</strong></p>
+
+  <button id="resetBtn">Reset to 90°</button>
+
+  <p class="status">Stop the camera before using manual control.</p>
+</div>
+
+<footer>PINCHSERVO v1.1 · Firefox-compatible diagnostics</footer>
+</div>
+
+<script type="module">
+
+import {
+  FilesetResolver,
+  HandLandmarker
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/vision_bundle.mjs";
+
+// ==========================================
+// CONFIGURATION
+// ==========================================
+
+const WASM_URL =
+  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/wasm";
+
+const MODEL_URL =
+  "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+
+const MAX_FPS = 15;
+const SEND_INTERVAL = 120;
+const SEND_THRESHOLD = 2;
+
+// ==========================================
+// ELEMENTS
+// ==========================================
+
+const $ = id => document.getElementById(id);
+
+const video = $("video");
+const canvas = $("canvas");
+const ctx = canvas.getContext("2d");
+
+// ==========================================
+// VARIABLES
+// ==========================================
+
+let handLandmarker = null;
+let cameraStream = null;
+let running = false;
+let espConnected = false;
+let requestPending = false;
+
+let smoothedAngle = 90;
+let lastSentAngle = -100;
+let lastAttemptTime = 0;
+
+let lastFrameTime = 0;
+let lastVideoTime = -1;
+
+let fpsFrames = 0;
+let fpsStart = 0;
+
+let animationID = null;
+let loadingPromise = null;
+
+// ==========================================
+// UTILITIES
+// ==========================================
+
+function setStatus(id, message, type = "") {
+  $(id).textContent = message;
+  $(id).className = "status " + type;
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function getBaseURL() {
+  let ip = $("espIP").value.trim();
+
+  if (!/^https?:\/\//i.test(ip)) {
+    ip = "http://" + ip;
+  }
+
+  return ip.replace(/\/+$/, "");
+}
+
+async function fetchTimeout(url, options = {}, timeout = 3000) {
+  const controller = new AbortController();
+
+  const timer = setTimeout(
+    () => controller.abort(),
+    timeout
+  );
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ==========================================
+// ESP32 CONNECTION
+// ==========================================
+
+async function connectESP() {
+  setStatus("connectionStatus", "Connecting...");
+
+  try {
+    const response = await fetchTimeout(
+      getBaseURL() + "/",
+      { cache: "no-store" },
+      3000
+    );
+
+    if (!response.ok) {
+      throw new Error("HTTP " + response.status);
+    }
+
+    const message = await response.text();
+
+    espConnected = true;
+
+    setStatus(
+      "connectionStatus",
+      "Connected: " + message,
+      "ok"
+    );
+
+  } catch (error) {
+    espConnected = false;
+
+    setStatus(
+      "connectionStatus",
+      "Connection failed: " + error.message,
+      "error"
+    );
+  }
+}
+
+$("connectBtn").addEventListener("click", connectESP);
+
+// ==========================================
+// SERVO TRANSMISSION
+// ==========================================
+
+async function sendAngle(value, force = false) {
+
+  const angle = clamp(Math.round(value), 0, 180);
+
+  if (!espConnected || requestPending) return;
+
+  const now = performance.now();
+
+  if (!force &&
+      Math.abs(angle - lastSentAngle) < SEND_THRESHOLD) {
+    return;
+  }
+
+  if (now - lastAttemptTime < SEND_INTERVAL) return;
+
+  requestPending = true;
+  lastAttemptTime = now;
+
+  try {
+    const response = await fetchTimeout(
+      getBaseURL() + "/set?angle=" + angle,
+      {
+        method: "GET",
+        cache: "no-store"
+      },
+      2000
+    );
+
+    if (!response.ok) {
+      throw new Error("HTTP " + response.status);
+    }
+
+    const result = await response.json();
+
+    if (result.status !== "ok") {
+      throw new Error("ESP32 rejected command");
+    }
+
+    lastSentAngle = result.angle;
+
+    setStatus(
+      "connectionStatus",
+      "Connected · Servo: " + result.angle + "°",
+      "ok"
+    );
+
+  } catch (error) {
+    espConnected = false;
+
+    setStatus(
+      "connectionStatus",
+      "Transmission error: " + error.message,
+      "error"
+    );
+
+  } finally {
+    requestPending = false;
+  }
+}
+
+// ==========================================
+// MANUAL CONTROL
+// ==========================================
+
+$("manualAngle").addEventListener("input", event => {
+
+  if (running) return;
+
+  const value = Number(event.target.value);
+
+  $("manualValue").textContent = value + "°";
+  $("angleValue").textContent = value + "°";
+
+  sendAngle(value, true);
+});
+
+$("resetBtn").addEventListener("click", () => {
+
+  if (running) {
+    setStatus(
+      "trackingStatus",
+      "Stop camera before manual control"
+    );
+    return;
+  }
+
+  $("manualAngle").value = 90;
+  $("manualValue").textContent = "90°";
+  $("angleValue").textContent = "90°";
+
+  sendAngle(90, true);
+});
+
+// ==========================================
+// MEDIAPIPE INITIALIZATION
+// ==========================================
+
+async function createHandLandmarker(fileset) {
+
+  return await HandLandmarker.createFromOptions(
+    fileset,
+    {
+      baseOptions: {
+        modelAssetPath: MODEL_URL,
+        delegate: "CPU"
+      },
+
+      runningMode: "VIDEO",
+      numHands: 1,
+
+      minHandDetectionConfidence: 0.5,
+      minHandPresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    }
+  );
+}
+
+async function loadMediaPipe() {
+
+  if (handLandmarker) return;
+
+  if (loadingPromise) return loadingPromise;
+
+  loadingPromise = (async () => {
+
+    setStatus(
+      "trackingStatus",
+      "Resolving MediaPipe WASM..."
+    );
+
+    try {
+
+      // Standard SIMD detection and fileset selection.
+      const vision =
+        await FilesetResolver.forVisionTasks(WASM_URL);
+
+      console.log("MediaPipe WASM fileset:", vision);
+
+      setStatus(
+        "trackingStatus",
+        "Loading hand detection model..."
+      );
+
+      handLandmarker =
+        await createHandLandmarker(vision);
+
+      console.log("MediaPipe initialized successfully.");
+
+    } catch (firstError) {
+
+      console.error(
+        "Standard MediaPipe initialization failed:",
+        firstError
+      );
+
+      // Retry using the non-SIMD runtime.
+      // This is useful for diagnosing SIMD-related failures.
+
+      setStatus(
+        "trackingStatus",
+        "Retrying with non-SIMD WASM..."
+      );
+
+      const fallbackFileset = {
+        wasmLoaderPath:
+          WASM_URL + "/vision_wasm_nosimd_internal.js",
+
+        wasmBinaryPath:
+          WASM_URL + "/vision_wasm_nosimd_internal.wasm"
+      };
+
+      try {
+
+        handLandmarker =
+          await createHandLandmarker(fallbackFileset);
+
+        console.log(
+          "MediaPipe initialized with non-SIMD WASM."
+        );
+
+      } catch (fallbackError) {
+
+        console.error(
+          "Non-SIMD initialization also failed:",
+          fallbackError
+        );
+
+        throw new Error(
+          "MediaPipe failed. Standard: " +
+          firstError.message +
+          " | Non-SIMD: " +
+          fallbackError.message
+        );
+      }
+    }
+
+  })();
+
+  try {
+    await loadingPromise;
+  } finally {
+    loadingPromise = null;
+  }
+}
+
+// ==========================================
+// START CAMERA
+// ==========================================
+
+async function startCamera() {
+
+  if (running) return;
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    setStatus(
+      "trackingStatus",
+      "Camera unavailable. Use localhost or HTTPS.",
+      "error"
+    );
+    return;
+  }
+
+  $("startBtn").disabled = true;
+
+  try {
+
+    await loadMediaPipe();
+
+    cameraStream =
+      await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          frameRate: { ideal: 15, max: 20 }
+        },
+        audio: false
+      });
+
+    video.srcObject = cameraStream;
+
+    await new Promise((resolve, reject) => {
+
+      video.onloadedmetadata = resolve;
+
+      video.onerror = () =>
+        reject(new Error("Video metadata failed"));
+
+    });
+
+    await video.play();
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    running = true;
+
+    lastFrameTime = 0;
+    lastVideoTime = -1;
+
+    fpsFrames = 0;
+    fpsStart = performance.now();
+
+    smoothedAngle = Number($("angleValue").textContent.replace("°", "")) || 90;
+
+    setStatus(
+      "trackingStatus",
+      "Camera active · Looking for hand...",
+      "ok"
+    );
+
+    processFrame();
+
+  } catch (error) {
+
+    console.error("STARTUP FAILURE:", error);
+
+    stopCamera();
+
+    setStatus(
+      "trackingStatus",
+      "Startup error: " + error.message,
+      "error"
+    );
+
+  } finally {
+    $("startBtn").disabled = false;
+  }
+}
+
+// ==========================================
+// STOP CAMERA
+// ==========================================
+
+function stopCamera() {
+
+  running = false;
+
+  if (animationID !== null) {
+    cancelAnimationFrame(animationID);
+    animationID = null;
+  }
+
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(track => track.stop());
+    cameraStream = null;
+  }
+
+  video.srcObject = null;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  $("fpsValue").textContent = "0";
+  $("distanceValue").textContent = "--";
+
+  setStatus("trackingStatus", "Camera stopped");
+}
+
+$("startBtn").addEventListener("click", startCamera);
+$("stopBtn").addEventListener("click", stopCamera);
+
+// ==========================================
+// DISTANCE
+// ==========================================
+
+function distance(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+// ==========================================
+// PINCH TO ANGLE
+// ==========================================
+
+function calculateAngle(landmarks) {
+
+  const thumb = landmarks[4];
+  const index = landmarks[8];
+
+  const palmWidth = distance(
+    landmarks[5],
+    landmarks[17]
+  );
+
+  if (palmWidth < 0.001) return null;
+
+  const pinchDistance = distance(thumb, index);
+  const ratio = pinchDistance / palmWidth;
+
+  const min = Number($("minDistance").value);
+  const max = Number($("maxDistance").value);
+
+  if (max <= min) return null;
+
+  let normalized = (ratio - min) / (max - min);
+
+  normalized = clamp(normalized, 0, 1);
+
+  return {
+    angle: normalized * 180,
+    ratio
+  };
+}
+
+// ==========================================
+// HAND DRAWING
+// ==========================================
+
+const CONNECTIONS = [
+  [0,1],[1,2],[2,3],[3,4],
+  [0,5],[5,6],[6,7],[7,8],
+  [5,9],[9,10],[10,11],[11,12],
+  [9,13],[13,14],[14,15],[15,16],
+  [13,17],[17,18],[18,19],[19,20],
+  [0,17]
+];
+
+function drawHand(landmarks) {
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "#63e6be";
+
+  CONNECTIONS.forEach(([a, b]) => {
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      landmarks[a].x * canvas.width,
+      landmarks[a].y * canvas.height
+    );
+
+    ctx.lineTo(
+      landmarks[b].x * canvas.width,
+      landmarks[b].y * canvas.height
+    );
+
+    ctx.stroke();
+  });
+
+  landmarks.forEach((point, index) => {
+
+    ctx.beginPath();
+
+    ctx.arc(
+      point.x * canvas.width,
+      point.y * canvas.height,
+      index === 4 || index === 8 ? 8 : 4,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.fillStyle =
+      index === 4 || index === 8
+        ? "#ff6b6b"
+        : "#ffffff";
+
+    ctx.fill();
+  });
+}
+
+// ==========================================
+// MAIN PROCESSING LOOP
+// ==========================================
+
+function processFrame() {
+
+  if (!running) return;
+
+  animationID = requestAnimationFrame(processFrame);
+
+  const now = performance.now();
+
+  if (now - lastFrameTime < 1000 / MAX_FPS) return;
+
+  if (
+    video.readyState < 2 ||
+    video.currentTime === lastVideoTime
+  ) return;
+
+  lastFrameTime = now;
+  lastVideoTime = video.currentTime;
+
+  try {
+
+    const result = handLandmarker.detectForVideo(
+      video,
+      now
+    );
+
+    fpsFrames++;
+
+    if (now - fpsStart >= 1000) {
+      $("fpsValue").textContent = fpsFrames;
+      fpsFrames = 0;
+      fpsStart = now;
+    }
+
+    if (result.landmarks?.length > 0) {
+
+      const landmarks = result.landmarks[0];
+
+      drawHand(landmarks);
+
+      const data = calculateAngle(landmarks);
+
+      if (data) {
+
+        smoothedAngle =
+          smoothedAngle * 0.70 +
+          data.angle * 0.30;
+
+        const angle = Math.round(smoothedAngle);
+
+        $("angleValue").textContent = angle + "°";
+        $("distanceValue").textContent = data.ratio.toFixed(3);
+
+        setStatus(
+          "trackingStatus",
+          "Hand detected · Tracking active",
+          "ok"
+        );
+
+        sendAngle(angle);
+      }
+
+    } else {
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      $("distanceValue").textContent = "--";
+
+      setStatus(
+        "trackingStatus",
+        "No hand detected · Holding position"
+      );
+    }
+
+  } catch (error) {
+
+    console.error("FRAME PROCESSING ERROR:", error);
+
+    stopCamera();
+
+    setStatus(
+      "trackingStatus",
+      "Tracking error: " + error.message,
+      "error"
+    );
+  }
+}
+
+// ==========================================
+// CALIBRATION LABELS
+// ==========================================
+
+$("minDistance").addEventListener("input", event => {
+  $("minLabel").textContent =
+    Number(event.target.value).toFixed(2);
+});
+
+$("maxDistance").addEventListener("input", event => {
+  $("maxLabel").textContent =
+    Number(event.target.value).toFixed(2);
+});
+
+// ==========================================
+// CLEANUP
+// ==========================================
+
+window.addEventListener("pagehide", () => {
+
+  stopCamera();
+
+  if (handLandmarker) {
+    handLandmarker.close();
+    handLandmarker = null;
+  }
+
+});
+
+</script>
+</body>
+</html>
