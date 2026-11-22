@@ -6,7 +6,6 @@ Browser hand-gesture controller for an ESP32-driven SG90 servo. MediaPipe runs e
 
 - `index.html` – web app (vanilla JS, MediaPipe Tasks Vision 0.10.14 pinned)
 - `PINCHSERVO_ESP32.ino` – firmware
-- `README.md`
 
 ## Wiring
 
@@ -84,7 +83,6 @@ Pinched fingers give a lower angle; open fingers give a higher angle. If the han
 
 ## Known limitations
 
-- Not hardware- or browser-tested by the author of this code; verify with the checklist.
 - Direct HTTPS→HTTP depends on the browser (see above).
 - No authentication: anyone on your LAN who can reach the ESP32 can move the servo.
 - MediaPipe, its WASM and the model load from jsdelivr and Google storage CDNs, so the first load needs internet.
