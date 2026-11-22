@@ -1,911 +1,427 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PINCHSERVO v1.1</title>
-
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PINCHSERVO</title>
 <style>
-* { box-sizing: border-box; }
-
-body {
-  margin: 0;
-  padding: 20px;
-  background: #10131b;
-  color: #e8edf5;
-  font-family: Arial, sans-serif;
-}
-
-.container {
-  max-width: 850px;
-  margin: auto;
-}
-
-h1 {
-  color: #63e6be;
-  margin-bottom: 5px;
-}
-
-.subtitle { color: #929bad; margin-top: 0; }
-
-.panel {
-  background: #1a2030;
-  border: 1px solid #30394d;
-  border-radius: 12px;
-  padding: 18px;
-  margin-top: 18px;
-}
-
-input, button {
-  padding: 12px;
-  border-radius: 7px;
-  border: 1px solid #39465e;
-  background: #111827;
-  color: white;
-  font-size: 14px;
-}
-
-input[type="text"] { width: 100%; }
-
-input[type="range"] {
-  width: 100%;
-  accent-color: #63e6be;
-  padding: 0;
-}
-
-button {
-  cursor: pointer;
-  background: #087f5b;
-  border: none;
-  margin-top: 10px;
-}
-
-button:hover { background: #099268; }
-button:disabled { opacity: .5; cursor: not-allowed; }
-
-.video-container {
-  position: relative;
-  width: 100%;
-  overflow: hidden;
-  border-radius: 10px;
-  background: #000;
-  margin-top: 12px;
-}
-
-video {
-  width: 100%;
-  display: block;
-  transform: scaleX(-1);
-}
-
-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  transform: scaleX(-1);
-  pointer-events: none;
-}
-
-.stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-top: 15px;
-}
-
-.stat {
-  background: #111827;
-  padding: 15px 5px;
-  border-radius: 8px;
-  text-align: center;
-}
-
-.stat small {
-  color: #929bad;
-  font-size: 11px;
-}
-
-.stat strong {
-  display: block;
-  font-size: 23px;
-  margin-top: 7px;
-  color: #63e6be;
-}
-
-.status {
-  color: #ffd43b;
-  font-size: 13px;
-  overflow-wrap: anywhere;
-}
-
-.status.ok { color: #63e6be; }
-.status.error { color: #ff8787; }
-
-label { font-size: 13px; color: #b6c0d0; }
-
-footer {
-  color: #758096;
-  text-align: center;
-  margin-top: 25px;
-  font-size: 12px;
-}
-
-@media (max-width: 420px) {
-  body { padding: 12px; }
-  .panel { padding: 14px; }
-  .stat strong { font-size: 19px; }
-}
+:root{--bg:#090d0b;--panel:#111915;--tile:#16211b;--line:#223128;--text:#e6f2ea;--mute:#87a092;--accent:#22e07a;--warn:#f2b84b;--bad:#ff5d6c}
+*{box-sizing:border-box}
+body{margin:0 auto;max-width:1200px;padding:16px;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;align-items:baseline;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+h1{margin:0;font-size:22px;letter-spacing:.16em}
+h1 span{color:var(--accent)}
+.sub{color:var(--mute);font-size:13px}
+.layout{display:grid;gap:14px;grid-template-columns:1fr}
+.col{display:grid;gap:14px;align-content:start}
+@media(min-width:900px){.layout{grid-template-columns:1.35fr 1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.panel h2{margin:0 0 10px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.stage{position:relative;width:100%;aspect-ratio:4/3;background:#000;border-radius:10px;overflow:hidden}
+.stage video,.stage canvas{position:absolute;inset:0;width:100%;height:100%;transform:scaleX(-1)}
+.ph{position:absolute;inset:0;display:grid;place-items:center;padding:20px;text-align:center;color:var(--mute);font-size:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+button{background:var(--accent);color:#04120a;border:0;border-radius:9px;padding:10px 16px;font:600 14px inherit;cursor:pointer}
+button.alt{background:var(--tile);color:var(--text);border:1px solid var(--line)}
+button:disabled{opacity:.4;cursor:not-allowed}
+input[type=text]{flex:1;min-width:140px;background:var(--tile);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:10px 12px;font:inherit}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.tile{background:var(--tile);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+.tile label{display:block;color:var(--mute);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.tile b{font-size:18px;font-variant-numeric:tabular-nums}
+[data-s=ok]{color:var(--accent)}[data-s=warn]{color:var(--warn)}[data-s=bad]{color:var(--bad)}
+.field{margin-top:8px}
+.field .top{display:flex;justify-content:space-between;color:var(--mute);font-size:13px}
+.field .top span:last-child{color:var(--text);font-variant-numeric:tabular-nums}
+.sw{display:flex;align-items:center;gap:8px;margin-top:10px;color:var(--mute);font-size:14px}
+.sw input{accent-color:var(--accent);width:18px;height:18px}
+.hint{color:var(--mute);font-size:12px;margin:8px 0 0}
+pre{margin:0;max-height:170px;overflow:auto;background:#060907;border:1px solid var(--line);border-radius:10px;padding:10px;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;color:#9fe8bd;white-space:pre-wrap;word-break:break-word}
 </style>
 </head>
-
 <body>
-<div class="container">
-
-<h1>PINCHSERVO</h1>
-<p class="subtitle">MediaPipe Vision · ESP32 · SG90</p>
-
-<div class="panel">
-  <h3>ESP32 Connection</h3>
-  <input type="text" id="espIP"
-    value="192.168.1.100"
-    placeholder="ESP32 IP address">
-
-  <button id="connectBtn">Connect ESP32</button>
-  <p class="status" id="connectionStatus">Not connected</p>
+<header>
+<h1>PINCH<span>SERVO</span></h1>
+<div class="sub">Browser hand tracking → ESP32 → SG90</div>
+</header>
+<div class="layout">
+<div class="col">
+<section class="panel">
+<h2>Camera</h2>
+<div class="stage" id="stage">
+<video id="video" playsinline muted autoplay></video>
+<canvas id="overlay"></canvas>
+<div class="ph" id="placeholder">Press Start Camera to begin hand tracking</div>
 </div>
-
-<div class="panel">
-  <h3>Hand Tracking</h3>
-
-  <div class="video-container">
-    <video id="video" autoplay muted playsinline></video>
-    <canvas id="canvas"></canvas>
-  </div>
-
-  <button id="startBtn">Start Camera</button>
-  <button id="stopBtn">Stop Camera</button>
-
-  <p class="status" id="trackingStatus">Camera stopped</p>
-
-  <div class="stats">
-    <div class="stat">
-      <small>ANGLE</small>
-      <strong id="angleValue">90°</strong>
-    </div>
-    <div class="stat">
-      <small>PINCH RATIO</small>
-      <strong id="distanceValue">--</strong>
-    </div>
-    <div class="stat">
-      <small>FPS</small>
-      <strong id="fpsValue">0</strong>
-    </div>
-  </div>
+<div class="row">
+<button id="startBtn">Start Camera</button>
+<button id="stopBtn" class="alt" disabled>Stop Camera</button>
 </div>
-
-<div class="panel">
-  <h3>Pinch Calibration</h3>
-
-  <label>
-    Minimum distance:
-    <span id="minLabel">0.15</span>
-  </label>
-
-  <input id="minDistance" type="range"
-    min="0.05" max="0.60" step="0.01" value="0.15">
-
-  <br><br>
-
-  <label>
-    Maximum distance:
-    <span id="maxLabel">1.00</span>
-  </label>
-
-  <input id="maxDistance" type="range"
-    min="0.30" max="1.80" step="0.01" value="1.00">
-
-  <p class="status">
-    Pinch closer = lower angle. Open fingers = higher angle.
-  </p>
+<label class="sw"><input type="checkbox" id="autoToggle" disabled><span id="modeText">Manual control</span></label>
+</section>
+<section class="panel">
+<h2>Diagnostics</h2>
+<pre id="diag"></pre>
+</section>
 </div>
-
-<div class="panel">
-  <h3>Manual Servo Control</h3>
-
-  <input type="range" id="manualAngle"
-    min="0" max="180" value="90">
-
-  <p>Manual angle: <strong id="manualValue">90°</strong></p>
-
-  <button id="resetBtn">Reset to 90°</button>
-
-  <p class="status">Stop the camera before using manual control.</p>
+<div class="col">
+<section class="panel">
+<h2>Live</h2>
+<div class="stats">
+<div class="tile"><label>Servo angle</label><b id="statAngle">90°</b></div>
+<div class="tile"><label>Pinch ratio</label><b id="statRatio">—</b></div>
+<div class="tile"><label>Processing FPS</label><b id="statFps">0</b></div>
+<div class="tile"><label>Camera</label><b id="statCamera" data-s="">Off</b></div>
+<div class="tile"><label>Hand</label><b id="statHand" data-s="">—</b></div>
+<div class="tile"><label>ESP32</label><b id="statEsp" data-s="">Not connected</b></div>
 </div>
-
-<footer>PINCHSERVO v1.1 · Firefox-compatible diagnostics</footer>
+</section>
+<section class="panel">
+<h2>ESP32 link</h2>
+<div class="row" style="margin-top:0">
+<input type="text" id="espHost" placeholder="192.168.1.105" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false">
+<button id="connectBtn">Connect</button>
 </div>
-
+<p class="hint" id="espMsg">Enter the IP shown on the LCD. On an https site, allow “Local network access” when the browser asks.</p>
+</section>
+<section class="panel">
+<h2>Calibration</h2>
+<div class="field"><div class="top"><span>Minimum distance (pinched = 0°)</span><span id="calMinVal">0.15</span></div>
+<input type="range" id="calMin" min="0" max="1.5" step="0.01" value="0.15"></div>
+<div class="field"><div class="top"><span>Maximum distance (open = 180°)</span><span id="calMaxVal">1.00</span></div>
+<input type="range" id="calMax" min="0.1" max="2.5" step="0.01" value="1.00"></div>
+</section>
+<section class="panel">
+<h2>Manual</h2>
+<div class="field"><div class="top"><span>Angle</span><span id="manualVal">90°</span></div>
+<input type="range" id="manualSlider" min="0" max="180" step="1" value="90"></div>
+<div class="row"><button id="resetBtn" class="alt">Reset to 90°</button></div>
+</section>
+</div>
+</div>
 <script type="module">
-
-import {
-  FilesetResolver,
-  HandLandmarker
-} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/vision_bundle.mjs";
-
-// ==========================================
-// CONFIGURATION
-// ==========================================
-
-const WASM_URL =
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/wasm";
-
-const MODEL_URL =
-  "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
-
-const MAX_FPS = 15;
-const SEND_INTERVAL = 120;
-const SEND_THRESHOLD = 2;
-
-// ==========================================
-// ELEMENTS
-// ==========================================
-
-const $ = id => document.getElementById(id);
-
-const video = $("video");
-const canvas = $("canvas");
-const ctx = canvas.getContext("2d");
-
-// ==========================================
-// VARIABLES
-// ==========================================
-
-let handLandmarker = null;
-let cameraStream = null;
-let running = false;
-let espConnected = false;
-let requestPending = false;
-
-let smoothedAngle = 90;
-let lastSentAngle = -100;
-let lastAttemptTime = 0;
-
-let lastFrameTime = 0;
-let lastVideoTime = -1;
-
-let fpsFrames = 0;
-let fpsStart = 0;
-
-let animationID = null;
-let loadingPromise = null;
-
-// ==========================================
-// UTILITIES
-// ==========================================
-
-function setStatus(id, message, type = "") {
-  $(id).textContent = message;
-  $(id).className = "status " + type;
+const MP_URL="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+const WASM_URL="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
+const MODEL_URL="https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+const TARGET_FPS=15,MIN_SEND_MS=60,TIMEOUT_MS=1500,MAX_FAILS=3,RETRY_MS=4000,MIN_GAP=0.1;
+const $=id=>document.getElementById(id);
+const video=$("video"),canvas=$("overlay"),ctx=canvas.getContext("2d"),stage=$("stage"),placeholder=$("placeholder");
+const startBtn=$("startBtn"),stopBtn=$("stopBtn"),autoToggle=$("autoToggle"),modeText=$("modeText");
+const statAngle=$("statAngle"),statRatio=$("statRatio"),statFps=$("statFps"),statCamera=$("statCamera"),statHand=$("statHand"),statEsp=$("statEsp");
+const calMin=$("calMin"),calMax=$("calMax"),calMinVal=$("calMinVal"),calMaxVal=$("calMaxVal");
+const manualSlider=$("manualSlider"),manualVal=$("manualVal"),resetBtn=$("resetBtn");
+const espHost=$("espHost"),connectBtn=$("connectBtn"),espMsg=$("espMsg"),diag=$("diag");
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const S={stream:null,mp:null,landmarker:null,raf:0,running:false,starting:false,auto:false,angle:90,smoothed:null,calMin:0.15,calMax:1,lastTs:0,interval:1000/TARGET_FPS,avgInf:0,frames:0,fpsT:performance.now(),lastVideoTime:-1,lastMpTs:0,lost:0};
+const link={base:"",enabled:false,connected:false,pinging:false,inflight:false,want:null,lastSent:null,lastTime:0,timer:0,fails:0};
+let lastLog="";
+function log(m){
+if(m===lastLog)return;
+lastLog=m;
+const d=new Date().toTimeString().slice(0,8);
+const lines=diag.textContent?diag.textContent.split("\n"):[];
+lines.unshift(d+"  "+m);
+diag.textContent=lines.slice(0,12).join("\n");
 }
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
+function st(e,t,s){e.textContent=t;e.dataset.s=s||"";}
+function setAngle(a){
+a=Math.round(clamp(a,0,180));
+S.angle=a;
+statAngle.textContent=a+"°";
+manualSlider.value=a;
+manualVal.textContent=a+"°";
+link.want=a;
+pump();
 }
-
-function getBaseURL() {
-  let ip = $("espIP").value.trim();
-
-  if (!/^https?:\/\//i.test(ip)) {
-    ip = "http://" + ip;
-  }
-
-  return ip.replace(/\/+$/, "");
+function setAuto(on){
+S.auto=on;
+S.smoothed=on?S.angle:null;
+autoToggle.checked=on;
+manualSlider.disabled=on;
+resetBtn.disabled=on;
+modeText.textContent=on?"Hand tracking controls the servo":"Manual control";
 }
-
-async function fetchTimeout(url, options = {}, timeout = 3000) {
-  const controller = new AbortController();
-
-  const timer = setTimeout(
-    () => controller.abort(),
-    timeout
-  );
-
-  try {
-    return await fetch(url, {
-      ...options,
-      signal: controller.signal
-    });
-  } finally {
-    clearTimeout(timer);
-  }
+function applyCal(src){
+let mn=parseFloat(calMin.value),mx=parseFloat(calMax.value);
+if(src==="min"&&mn>mx-MIN_GAP)mn=Math.max(0,mx-MIN_GAP);
+if(src==="max"&&mx<mn+MIN_GAP)mx=mn+MIN_GAP;
+calMin.value=mn.toFixed(2);
+calMax.value=mx.toFixed(2);
+S.calMin=mn;
+S.calMax=mx;
+calMinVal.textContent=mn.toFixed(2);
+calMaxVal.textContent=mx.toFixed(2);
 }
-
-// ==========================================
-// ESP32 CONNECTION
-// ==========================================
-
-async function connectESP() {
-  setStatus("connectionStatus", "Connecting...");
-
-  try {
-    const response = await fetchTimeout(
-      getBaseURL() + "/",
-      { cache: "no-store" },
-      3000
-    );
-
-    if (!response.ok) {
-      throw new Error("HTTP " + response.status);
-    }
-
-    const message = await response.text();
-
-    espConnected = true;
-
-    setStatus(
-      "connectionStatus",
-      "Connected: " + message,
-      "ok"
-    );
-
-  } catch (error) {
-    espConnected = false;
-
-    setStatus(
-      "connectionStatus",
-      "Connection failed: " + error.message,
-      "error"
-    );
-  }
+async function lnaState(){
+for(const n of ["local-network","local-network-access"]){
+try{const p=await navigator.permissions.query({name:n});return n+" permission: "+p.state;}catch(e){}
 }
-
-$("connectBtn").addEventListener("click", connectESP);
-
-// ==========================================
-// SERVO TRANSMISSION
-// ==========================================
-
-async function sendAngle(value, force = false) {
-
-  const angle = clamp(Math.round(value), 0, 180);
-
-  if (!espConnected || requestPending) return;
-
-  const now = performance.now();
-
-  if (!force &&
-      Math.abs(angle - lastSentAngle) < SEND_THRESHOLD) {
-    return;
-  }
-
-  if (now - lastAttemptTime < SEND_INTERVAL) return;
-
-  requestPending = true;
-  lastAttemptTime = now;
-
-  try {
-    const response = await fetchTimeout(
-      getBaseURL() + "/set?angle=" + angle,
-      {
-        method: "GET",
-        cache: "no-store"
-      },
-      2000
-    );
-
-    if (!response.ok) {
-      throw new Error("HTTP " + response.status);
-    }
-
-    const result = await response.json();
-
-    if (result.status !== "ok") {
-      throw new Error("ESP32 rejected command");
-    }
-
-    lastSentAngle = result.angle;
-
-    setStatus(
-      "connectionStatus",
-      "Connected · Servo: " + result.angle + "°",
-      "ok"
-    );
-
-  } catch (error) {
-    espConnected = false;
-
-    setStatus(
-      "connectionStatus",
-      "Transmission error: " + error.message,
-      "error"
-    );
-
-  } finally {
-    requestPending = false;
-  }
+return "local network permission not exposed by this browser";
 }
-
-// ==========================================
-// MANUAL CONTROL
-// ==========================================
-
-$("manualAngle").addEventListener("input", event => {
-
-  if (running) return;
-
-  const value = Number(event.target.value);
-
-  $("manualValue").textContent = value + "°";
-  $("angleValue").textContent = value + "°";
-
-  sendAngle(value, true);
+function explain(e){
+if(e&&e.name==="AbortError")return "Timeout: ESP32 did not answer (wrong IP, different network, or powered off)";
+if(e instanceof TypeError){
+if(location.protocol==="https:"){
+if(/firefox/i.test(navigator.userAgent))return "Blocked: Firefox treats http requests from https pages as mixed content. Use the shield/padlock icon to disable protection for this site, or open the page from http://localhost";
+return "Blocked or unreachable: allow “Local network access” for this site (padlock → Site settings) in Chrome/Edge 142+, check the IP, and confirm the device is on the same network. Browsers without that exemption block http from https";
+}
+return "Network error: device unreachable or CORS rejected";
+}
+return e&&e.message?e.message:String(e);
+}
+function parseBase(v){
+v=v.trim().replace(/^https?:\/\//i,"").replace(/\/.*$/,"");
+if(!/^[A-Za-z0-9.-]+(:\d{1,5})?$/.test(v))return null;
+return "http://"+v;
+}
+async function espFetch(path,json){
+const ctl=new AbortController();
+const to=setTimeout(()=>ctl.abort(),TIMEOUT_MS);
+try{
+const r=await fetch(link.base+path,{method:"GET",mode:"cors",signal:ctl.signal,targetAddressSpace:"local"});
+if(!r.ok)throw new Error("HTTP "+r.status);
+return json?await r.json():await r.text();
+}finally{clearTimeout(to);}
+}
+async function connect(){
+if(link.pinging)return;
+const base=parseBase(espHost.value);
+if(!base){espMsg.textContent="Invalid address";return;}
+link.base=base;
+link.enabled=true;
+link.pinging=true;
+try{localStorage.setItem("pinchservo.host",espHost.value.trim());}catch(e){}
+if(!link.connected)st(statEsp,"Connecting…","warn");
+try{
+const t=await espFetch("/",false);
+if(!/PINCHSERVO/i.test(t))throw new Error("Unexpected response from device");
+link.connected=true;
+link.fails=0;
+link.lastSent=null;
+link.want=S.angle;
+st(statEsp,"Connected","ok");
+espMsg.textContent="Connected to "+base;
+log("ESP32 connected: "+base);
+pump();
+}catch(e){
+link.connected=false;
+st(statEsp,"Disconnected","bad");
+const m=explain(e);
+espMsg.textContent=m;
+log(m);
+log(await lnaState());
+}finally{link.pinging=false;}
+}
+function pump(){
+if(!link.connected||link.inflight||link.want===null||link.want===link.lastSent)return;
+const wait=MIN_SEND_MS-(performance.now()-link.lastTime);
+if(wait>0){
+if(!link.timer)link.timer=setTimeout(()=>{link.timer=0;pump();},wait);
+return;
+}
+const a=link.want;
+link.inflight=true;
+link.lastTime=performance.now();
+espFetch("/set?angle="+a,true).then(j=>{
+if(!j||j.status!=="ok"||j.angle!==a)throw new Error("Unexpected /set response: "+JSON.stringify(j));
+link.lastSent=a;
+link.fails=0;
+}).catch(e=>{
+link.fails++;
+link.lastTime=performance.now()+300;
+log("Send failed ("+link.fails+"/"+MAX_FAILS+"): "+explain(e));
+if(link.fails>=MAX_FAILS){
+link.connected=false;
+st(statEsp,"Disconnected","bad");
+espMsg.textContent="Connection lost. Retrying automatically.";
+}
+}).finally(()=>{link.inflight=false;pump();});
+}
+setInterval(()=>{if(link.enabled&&!link.connected&&!link.pinging&&!link.inflight)connect();},RETRY_MS);
+async function initLandmarker(){
+st(statHand,"Loading model…","warn");
+try{
+S.mp=await import(MP_URL);
+const fs=await S.mp.FilesetResolver.forVisionTasks(WASM_URL);
+S.landmarker=await S.mp.HandLandmarker.createFromOptions(fs,{
+baseOptions:{modelAssetPath:MODEL_URL,delegate:"CPU"},
+runningMode:"VIDEO",
+numHands:1,
+minHandDetectionConfidence:0.5,
+minHandPresenceConfidence:0.5,
+minTrackingConfidence:0.5
 });
-
-$("resetBtn").addEventListener("click", () => {
-
-  if (running) {
-    setStatus(
-      "trackingStatus",
-      "Stop camera before manual control"
-    );
-    return;
-  }
-
-  $("manualAngle").value = 90;
-  $("manualValue").textContent = "90°";
-  $("angleValue").textContent = "90°";
-
-  sendAngle(90, true);
-});
-
-// ==========================================
-// MEDIAPIPE INITIALIZATION
-// ==========================================
-
-async function createHandLandmarker(fileset) {
-
-  return await HandLandmarker.createFromOptions(
-    fileset,
-    {
-      baseOptions: {
-        modelAssetPath: MODEL_URL,
-        delegate: "CPU"
-      },
-
-      runningMode: "VIDEO",
-      numHands: 1,
-
-      minHandDetectionConfidence: 0.5,
-      minHandPresenceConfidence: 0.5,
-      minTrackingConfidence: 0.5
-    }
-  );
+}catch(e){
+S.mp=null;
+S.landmarker=null;
+throw new Error("MediaPipe initialization failed ("+(e&&e.message?e.message:e)+"). Check network access to cdn.jsdelivr.net and storage.googleapis.com");
 }
-
-async function loadMediaPipe() {
-
-  if (handLandmarker) return;
-
-  if (loadingPromise) return loadingPromise;
-
-  loadingPromise = (async () => {
-
-    setStatus(
-      "trackingStatus",
-      "Resolving MediaPipe WASM..."
-    );
-
-    try {
-
-      // Standard SIMD detection and fileset selection.
-      const vision =
-        await FilesetResolver.forVisionTasks(WASM_URL);
-
-      console.log("MediaPipe WASM fileset:", vision);
-
-      setStatus(
-        "trackingStatus",
-        "Loading hand detection model..."
-      );
-
-      handLandmarker =
-        await createHandLandmarker(vision);
-
-      console.log("MediaPipe initialized successfully.");
-
-    } catch (firstError) {
-
-      console.error(
-        "Standard MediaPipe initialization failed:",
-        firstError
-      );
-
-      // Retry using the non-SIMD runtime.
-      // This is useful for diagnosing SIMD-related failures.
-
-      setStatus(
-        "trackingStatus",
-        "Retrying with non-SIMD WASM..."
-      );
-
-      const fallbackFileset = {
-        wasmLoaderPath:
-          WASM_URL + "/vision_wasm_nosimd_internal.js",
-
-        wasmBinaryPath:
-          WASM_URL + "/vision_wasm_nosimd_internal.wasm"
-      };
-
-      try {
-
-        handLandmarker =
-          await createHandLandmarker(fallbackFileset);
-
-        console.log(
-          "MediaPipe initialized with non-SIMD WASM."
-        );
-
-      } catch (fallbackError) {
-
-        console.error(
-          "Non-SIMD initialization also failed:",
-          fallbackError
-        );
-
-        throw new Error(
-          "MediaPipe failed. Standard: " +
-          firstError.message +
-          " | Non-SIMD: " +
-          fallbackError.message
-        );
-      }
-    }
-
-  })();
-
-  try {
-    await loadingPromise;
-  } finally {
-    loadingPromise = null;
-  }
 }
-
-// ==========================================
-// START CAMERA
-// ==========================================
-
-async function startCamera() {
-
-  if (running) return;
-
-  if (!navigator.mediaDevices?.getUserMedia) {
-    setStatus(
-      "trackingStatus",
-      "Camera unavailable. Use localhost or HTTPS.",
-      "error"
-    );
-    return;
-  }
-
-  $("startBtn").disabled = true;
-
-  try {
-
-    await loadMediaPipe();
-
-    cameraStream =
-      await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          frameRate: { ideal: 15, max: 20 }
-        },
-        audio: false
-      });
-
-    video.srcObject = cameraStream;
-
-    await new Promise((resolve, reject) => {
-
-      video.onloadedmetadata = resolve;
-
-      video.onerror = () =>
-        reject(new Error("Video metadata failed"));
-
-    });
-
-    await video.play();
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    running = true;
-
-    lastFrameTime = 0;
-    lastVideoTime = -1;
-
-    fpsFrames = 0;
-    fpsStart = performance.now();
-
-    smoothedAngle = Number($("angleValue").textContent.replace("°", "")) || 90;
-
-    setStatus(
-      "trackingStatus",
-      "Camera active · Looking for hand...",
-      "ok"
-    );
-
-    processFrame();
-
-  } catch (error) {
-
-    console.error("STARTUP FAILURE:", error);
-
-    stopCamera();
-
-    setStatus(
-      "trackingStatus",
-      "Startup error: " + error.message,
-      "error"
-    );
-
-  } finally {
-    $("startBtn").disabled = false;
-  }
+function camError(e){
+switch(e&&e.name){
+case "NotAllowedError":return "Camera permission denied. Allow camera access in the browser site settings and retry";
+case "NotFoundError":return "No camera found";
+case "NotReadableError":return "Camera is in use by another application";
+case "OverconstrainedError":return "Camera does not support the requested settings";
+case "SecurityError":
+case "InsecureContext":return "Camera requires HTTPS or localhost";
+default:return e&&e.message?e.message:String(e);
 }
-
-// ==========================================
-// STOP CAMERA
-// ==========================================
-
-function stopCamera() {
-
-  running = false;
-
-  if (animationID !== null) {
-    cancelAnimationFrame(animationID);
-    animationID = null;
-  }
-
-  if (cameraStream) {
-    cameraStream.getTracks().forEach(track => track.stop());
-    cameraStream = null;
-  }
-
-  video.srcObject = null;
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  $("fpsValue").textContent = "0";
-  $("distanceValue").textContent = "--";
-
-  setStatus("trackingStatus", "Camera stopped");
 }
-
-$("startBtn").addEventListener("click", startCamera);
-$("stopBtn").addEventListener("click", stopCamera);
-
-// ==========================================
-// DISTANCE
-// ==========================================
-
-function distance(a, b) {
-  return Math.hypot(a.x - b.x, a.y - b.y);
+function releaseStream(){
+if(S.stream){S.stream.getTracks().forEach(t=>t.stop());S.stream=null;}
+video.pause();
+video.srcObject=null;
 }
-
-// ==========================================
-// PINCH TO ANGLE
-// ==========================================
-
-function calculateAngle(landmarks) {
-
-  const thumb = landmarks[4];
-  const index = landmarks[8];
-
-  const palmWidth = distance(
-    landmarks[5],
-    landmarks[17]
-  );
-
-  if (palmWidth < 0.001) return null;
-
-  const pinchDistance = distance(thumb, index);
-  const ratio = pinchDistance / palmWidth;
-
-  const min = Number($("minDistance").value);
-  const max = Number($("maxDistance").value);
-
-  if (max <= min) return null;
-
-  let normalized = (ratio - min) / (max - min);
-
-  normalized = clamp(normalized, 0, 1);
-
-  return {
-    angle: normalized * 180,
-    ratio
-  };
+async function startCamera(){
+if(S.running||S.starting)return;
+S.starting=true;
+startBtn.disabled=true;
+st(statCamera,"Starting…","warn");
+try{
+if(!window.isSecureContext||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+const e=new Error("Camera requires HTTPS or localhost");
+e.name="InsecureContext";
+throw e;
 }
-
-// ==========================================
-// HAND DRAWING
-// ==========================================
-
-const CONNECTIONS = [
-  [0,1],[1,2],[2,3],[3,4],
-  [0,5],[5,6],[6,7],[7,8],
-  [5,9],[9,10],[10,11],[11,12],
-  [9,13],[13,14],[14,15],[15,16],
-  [13,17],[17,18],[18,19],[19,20],
-  [0,17]
-];
-
-function drawHand(landmarks) {
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = "#63e6be";
-
-  CONNECTIONS.forEach(([a, b]) => {
-
-    ctx.beginPath();
-
-    ctx.moveTo(
-      landmarks[a].x * canvas.width,
-      landmarks[a].y * canvas.height
-    );
-
-    ctx.lineTo(
-      landmarks[b].x * canvas.width,
-      landmarks[b].y * canvas.height
-    );
-
-    ctx.stroke();
-  });
-
-  landmarks.forEach((point, index) => {
-
-    ctx.beginPath();
-
-    ctx.arc(
-      point.x * canvas.width,
-      point.y * canvas.height,
-      index === 4 || index === 8 ? 8 : 4,
-      0,
-      Math.PI * 2
-    );
-
-    ctx.fillStyle =
-      index === 4 || index === 8
-        ? "#ff6b6b"
-        : "#ffffff";
-
-    ctx.fill();
-  });
+S.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:{ideal:640},height:{ideal:480},frameRate:{ideal:30}},audio:false});
+video.srcObject=S.stream;
+await video.play();
+if(!video.videoWidth)await new Promise(r=>video.addEventListener("loadedmetadata",r,{once:true}));
+canvas.width=video.videoWidth;
+canvas.height=video.videoHeight;
+stage.style.aspectRatio=video.videoWidth+"/"+video.videoHeight;
+if(!S.landmarker)await initLandmarker();
+S.running=true;
+S.lastVideoTime=-1;
+S.lastTs=0;
+S.avgInf=0;
+S.interval=1000/TARGET_FPS;
+S.frames=0;
+S.fpsT=performance.now();
+S.lost=0;
+placeholder.style.display="none";
+stopBtn.disabled=false;
+autoToggle.disabled=false;
+st(statCamera,"Running","ok");
+st(statHand,"Searching…","warn");
+log("Camera started "+video.videoWidth+"×"+video.videoHeight);
+setAuto(true);
+S.raf=requestAnimationFrame(loop);
+}catch(e){
+const m=S.stream?(e.message||String(e)):camError(e);
+log(m);
+st(statCamera,"Error","bad");
+st(statHand,"—","");
+releaseStream();
+startBtn.disabled=false;
+}finally{S.starting=false;}
 }
-
-// ==========================================
-// MAIN PROCESSING LOOP
-// ==========================================
-
-function processFrame() {
-
-  if (!running) return;
-
-  animationID = requestAnimationFrame(processFrame);
-
-  const now = performance.now();
-
-  if (now - lastFrameTime < 1000 / MAX_FPS) return;
-
-  if (
-    video.readyState < 2 ||
-    video.currentTime === lastVideoTime
-  ) return;
-
-  lastFrameTime = now;
-  lastVideoTime = video.currentTime;
-
-  try {
-
-    const result = handLandmarker.detectForVideo(
-      video,
-      now
-    );
-
-    fpsFrames++;
-
-    if (now - fpsStart >= 1000) {
-      $("fpsValue").textContent = fpsFrames;
-      fpsFrames = 0;
-      fpsStart = now;
-    }
-
-    if (result.landmarks?.length > 0) {
-
-      const landmarks = result.landmarks[0];
-
-      drawHand(landmarks);
-
-      const data = calculateAngle(landmarks);
-
-      if (data) {
-
-        smoothedAngle =
-          smoothedAngle * 0.70 +
-          data.angle * 0.30;
-
-        const angle = Math.round(smoothedAngle);
-
-        $("angleValue").textContent = angle + "°";
-        $("distanceValue").textContent = data.ratio.toFixed(3);
-
-        setStatus(
-          "trackingStatus",
-          "Hand detected · Tracking active",
-          "ok"
-        );
-
-        sendAngle(angle);
-      }
-
-    } else {
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      $("distanceValue").textContent = "--";
-
-      setStatus(
-        "trackingStatus",
-        "No hand detected · Holding position"
-      );
-    }
-
-  } catch (error) {
-
-    console.error("FRAME PROCESSING ERROR:", error);
-
-    stopCamera();
-
-    setStatus(
-      "trackingStatus",
-      "Tracking error: " + error.message,
-      "error"
-    );
-  }
+function stopCamera(){
+S.running=false;
+cancelAnimationFrame(S.raf);
+releaseStream();
+ctx.clearRect(0,0,canvas.width,canvas.height);
+placeholder.style.display="grid";
+startBtn.disabled=false;
+stopBtn.disabled=true;
+autoToggle.disabled=true;
+setAuto(false);
+st(statCamera,"Off","");
+st(statHand,"—","");
+st(statRatio,"—","");
+statFps.textContent="0";
 }
-
-// ==========================================
-// CALIBRATION LABELS
-// ==========================================
-
-$("minDistance").addEventListener("input", event => {
-  $("minLabel").textContent =
-    Number(event.target.value).toFixed(2);
-});
-
-$("maxDistance").addEventListener("input", event => {
-  $("maxLabel").textContent =
-    Number(event.target.value).toFixed(2);
-});
-
-// ==========================================
-// CLEANUP
-// ==========================================
-
-window.addEventListener("pagehide", () => {
-
-  stopCamera();
-
-  if (handLandmarker) {
-    handLandmarker.close();
-    handLandmarker = null;
-  }
-
-});
-
+function draw(lm){
+const w=canvas.width,h=canvas.height;
+ctx.clearRect(0,0,w,h);
+if(!lm)return;
+ctx.lineWidth=2;
+ctx.strokeStyle="rgba(34,224,122,.55)";
+ctx.beginPath();
+for(const c of S.mp.HandLandmarker.HAND_CONNECTIONS){
+const a=lm[c.start],b=lm[c.end];
+ctx.moveTo(a.x*w,a.y*h);
+ctx.lineTo(b.x*w,b.y*h);
+}
+ctx.stroke();
+ctx.fillStyle="#e6f2ea";
+for(const p of lm){ctx.beginPath();ctx.arc(p.x*w,p.y*h,3,0,6.283);ctx.fill();}
+const seg=(a,b,c,wd)=>{ctx.strokeStyle=c;ctx.lineWidth=wd;ctx.beginPath();ctx.moveTo(lm[a].x*w,lm[a].y*h);ctx.lineTo(lm[b].x*w,lm[b].y*h);ctx.stroke();};
+seg(5,17,"#f2b84b",2);
+seg(4,8,"#22e07a",4);
+ctx.fillStyle="#22e07a";
+for(const i of [4,8]){ctx.beginPath();ctx.arc(lm[i].x*w,lm[i].y*h,7,0,6.283);ctx.fill();}
+}
+function track(lm){
+const vw=video.videoWidth,vh=video.videoHeight;
+const d=(a,b)=>Math.hypot((lm[a].x-lm[b].x)*vw,(lm[a].y-lm[b].y)*vh);
+const palm=d(5,17);
+if(palm<8)return;
+const ratio=d(4,8)/palm;
+statRatio.textContent=ratio.toFixed(2);
+if(!S.auto)return;
+const target=clamp((ratio-S.calMin)/(S.calMax-S.calMin),0,1)*180;
+if(S.smoothed===null)S.smoothed=S.angle;
+const diff=Math.abs(target-S.smoothed);
+S.smoothed+=(target-S.smoothed)*(diff>40?0.6:0.3);
+const out=Math.round(S.smoothed);
+if(out!==S.angle)setAngle(out);
+}
+function loop(){
+if(!S.running)return;
+S.raf=requestAnimationFrame(loop);
+const now=performance.now();
+if(now-S.lastTs<S.interval)return;
+if(video.readyState<2||video.currentTime===S.lastVideoTime)return;
+S.lastTs=now;
+S.lastVideoTime=video.currentTime;
+const ts=Math.max(Math.floor(now),S.lastMpTs+1);
+S.lastMpTs=ts;
+let res;
+try{
+res=S.landmarker.detectForVideo(video,ts);
+}catch(e){
+log("Inference error: "+(e&&e.message?e.message:e));
+stopCamera();
+return;
+}
+const dt=performance.now()-now;
+S.avgInf=S.avgInf?S.avgInf*0.9+dt*0.1:dt;
+S.interval=Math.min(200,Math.max(1000/TARGET_FPS,S.avgInf*1.6));
+const lm=res.landmarks&&res.landmarks[0];
+if(lm){
+S.lost=0;
+st(statHand,"Detected","ok");
+draw(lm);
+track(lm);
+}else{
+S.lost++;
+if(S.lost>=3){
+draw(null);
+st(statHand,S.auto?"Lost (holding)":"None","warn");
+st(statRatio,"—","");
+}
+}
+S.frames++;
+const el=now-S.fpsT;
+if(el>=1000){statFps.textContent=String(Math.round(S.frames*1000/el));S.frames=0;S.fpsT=now;}
+}
+startBtn.addEventListener("click",startCamera);
+stopBtn.addEventListener("click",stopCamera);
+autoToggle.addEventListener("change",()=>setAuto(autoToggle.checked));
+calMin.addEventListener("input",()=>applyCal("min"));
+calMax.addEventListener("input",()=>applyCal("max"));
+manualSlider.addEventListener("input",()=>{if(!S.auto)setAngle(parseInt(manualSlider.value,10));});
+resetBtn.addEventListener("click",()=>{if(!S.auto)setAngle(90);});
+connectBtn.addEventListener("click",()=>{link.fails=0;connect();});
+espHost.addEventListener("keydown",e=>{if(e.key==="Enter")connect();});
+window.addEventListener("pagehide",()=>{stopCamera();if(S.landmarker){try{S.landmarker.close();}catch(e){}}});
+try{const h=localStorage.getItem("pinchservo.host");if(h)espHost.value=h;}catch(e){}
+applyCal();
+setAuto(false);
+if(!window.isSecureContext)log("Not a secure context: camera will be unavailable. Use HTTPS or localhost");
 </script>
 </body>
 </html>
